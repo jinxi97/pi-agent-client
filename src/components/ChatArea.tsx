@@ -42,19 +42,38 @@ export default function ChatArea({
     const updated = [...messages, userMsg]
     onMessagesChange(updated)
 
-    const assistantMsg: Message = { role: 'assistant', text: '' }
-    let currentMessages = [...updated, assistantMsg]
+    // Don't add an empty assistant message upfront — create it on first text delta.
+    let currentMessages = [...updated]
     onMessagesChange(currentMessages)
 
     await sendMessage(workspace, sessionId, text, {
       onTextDelta: (delta) => {
         const last = currentMessages[currentMessages.length - 1]
-        const newMsg = { ...last, text: last.text + delta }
-        currentMessages = [...currentMessages.slice(0, -1), newMsg]
+        // If last message isn't an assistant message, create one
+        if (!last || last.role !== 'assistant') {
+          const newAssistant: Message = { role: 'assistant', text: delta }
+          currentMessages = [...currentMessages, newAssistant]
+        } else {
+          const newMsg = { ...last, text: last.text + delta }
+          currentMessages = [...currentMessages.slice(0, -1), newMsg]
+        }
         onMessagesChange(currentMessages)
       },
-      onToolStart: (toolName) => setActiveTool(toolName),
-      onToolEnd: () => setActiveTool(null),
+      onToolStart: (toolName, args) => {
+        setActiveTool(toolName)
+        const toolMsg: Message = { role: 'tool', text: '', toolName, toolArgs: args }
+        currentMessages = [...currentMessages, toolMsg]
+        onMessagesChange(currentMessages)
+      },
+      onToolEnd: (toolName, result, isError) => {
+        const idx = currentMessages.findLastIndex((m) => m.role === 'tool' && m.toolName === toolName && m.text !== 'done')
+        if (idx >= 0) {
+          const updated = { ...currentMessages[idx], text: 'done', toolResult: result, toolIsError: isError }
+          currentMessages = [...currentMessages.slice(0, idx), updated, ...currentMessages.slice(idx + 1)]
+          onMessagesChange(currentMessages)
+        }
+        setActiveTool(null)
+      },
       onDone: () => {
         setIsStreaming(false)
         setActiveTool(null)
@@ -88,29 +107,22 @@ export default function ChatArea({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((msg, i) => (
+        {messages
+          .filter((msg) => msg.role === 'tool' || msg.text)
+          .map((msg, i, filtered) => (
           <MessageBubble
             key={i}
             message={msg}
             isStreaming={
               isStreaming &&
-              i === messages.length - 1 &&
+              i === filtered.length - 1 &&
               msg.role === 'assistant'
             }
           />
         ))}
-
-        {activeTool && (
-          <div className="flex justify-start">
-            <div className="bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400 text-xs px-3 py-1.5 rounded-lg flex items-center gap-2">
-              <span className="w-2 h-2 bg-neutral-400 dark:bg-white rounded-full animate-pulse" />
-              Using {activeTool}...
-            </div>
-          </div>
-        )}
 
         <div ref={messagesEndRef} />
       </div>

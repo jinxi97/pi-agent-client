@@ -104,19 +104,47 @@ export default function ChatLayout({ onLogout, dark, onToggleTheme }: ChatLayout
 
     apiGetSession(workspace, activeSessionId)
       .then((data) => {
-        const msgs: Message[] = (data.messages || [])
-          .filter(
-            (m: { role: string }) =>
-              m.role === 'user' || m.role === 'assistant',
-          )
-          .map((m: { role: string; content: Array<{ type: string; text?: string }> }) => ({
-            role: m.role as 'user' | 'assistant',
-            text: m.content
+        const msgs: Message[] = []
+        for (const m of data.messages || []) {
+          if (m.role === 'user') {
+            const text = m.content
               ?.filter((c: { type: string }) => c.type === 'text')
               .map((c: { text?: string }) => c.text || '')
-              .join('') || '',
-          }))
-          .filter((m: Message) => m.text)
+              .join('') || ''
+            if (text) msgs.push({ role: 'user', text })
+          } else if (m.role === 'assistant') {
+            // Extract text content
+            const text = m.content
+              ?.filter((c: { type: string }) => c.type === 'text')
+              .map((c: { text?: string }) => c.text || '')
+              .join('') || ''
+            if (text) msgs.push({ role: 'assistant', text })
+
+            // Extract tool_use blocks as tool messages
+            for (const block of m.content || []) {
+              if (block.type === 'tool_use' || block.type === 'toolUse') {
+                const toolName = block.name || block.toolName || 'tool'
+                const toolArgs = block.input || block.args
+                msgs.push({ role: 'tool', text: '', toolName, toolArgs })
+              }
+            }
+          } else if (m.role === 'toolResult') {
+            const toolName = (m as { toolName?: string }).toolName || 'tool'
+            const resultText = m.content
+              ?.filter((c: { type: string }) => c.type === 'text')
+              .map((c: { text?: string }) => c.text || '')
+              .join('\n') || ''
+            // Find the matching pending tool message and update it
+            const idx = msgs.findLastIndex(
+              (msg) => msg.role === 'tool' && msg.toolName === toolName && msg.text !== 'done',
+            )
+            if (idx >= 0) {
+              msgs[idx] = { ...msgs[idx], text: 'done', toolResult: resultText, toolIsError: !!(m as { isError?: boolean }).isError }
+            } else {
+              msgs.push({ role: 'tool', text: 'done', toolName, toolResult: resultText, toolIsError: !!(m as { isError?: boolean }).isError })
+            }
+          }
+        }
         setMessages(msgs)
       })
       .catch(console.error)
@@ -192,7 +220,7 @@ export default function ChatLayout({ onLogout, dark, onToggleTheme }: ChatLayout
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
       />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Top bar */}
         <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-neutral-200 dark:border-neutral-800">
           <ThemeToggle dark={dark} onToggle={onToggleTheme} />

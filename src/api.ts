@@ -198,8 +198,8 @@ export async function getSession(
 
 export interface SSECallbacks {
   onTextDelta: (delta: string) => void
-  onToolStart: (toolName: string) => void
-  onToolEnd: (toolName: string) => void
+  onToolStart: (toolName: string, args?: Record<string, unknown>) => void
+  onToolEnd: (toolName: string, result?: string, isError?: boolean) => void
   onDone: () => void
   onError: (error: string) => void
 }
@@ -263,13 +263,30 @@ export async function sendMessage(
             callbacks.onTextDelta(evt.delta)
           }
         } else if (eventType === 'tool_execution_start') {
-          callbacks.onToolStart(data.toolName || 'tool')
+          const toolName = data.toolName || data.name || data.details?.toolName || 'tool'
+          const args = data.args || data.parameters || data.details?.args
+          callbacks.onToolStart(toolName, args)
         } else if (eventType === 'tool_execution_end') {
-          callbacks.onToolEnd(data.toolName || 'tool')
+          const toolName = data.toolName || data.name || data.details?.toolName || 'tool'
+          let resultText: string | undefined
+          if (data.result?.content) {
+            resultText = data.result.content
+              .filter((c: { type: string }) => c.type === 'text')
+              .map((c: { text?: string }) => c.text || '')
+              .join('\n')
+          } else if (typeof data.result === 'string') {
+            resultText = data.result
+          }
+          callbacks.onToolEnd(toolName, resultText, data.isError)
         } else if (eventType === 'agent_end') {
           callbacks.onDone()
         } else if (eventType === 'error') {
           callbacks.onError(data.error || 'Unknown error')
+        }
+
+        // Debug: log all events to console during development
+        if (import.meta.env.DEV) {
+          console.log(`[SSE] ${eventType}`, data)
         }
       } catch {
         // skip unparseable events

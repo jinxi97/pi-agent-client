@@ -8,8 +8,12 @@ export interface Session {
 }
 
 export interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'tool'
   text: string
+  toolName?: string
+  toolArgs?: Record<string, unknown>
+  toolResult?: string
+  toolIsError?: boolean
 }
 
 export interface WorkspaceInfo {
