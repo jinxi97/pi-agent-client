@@ -18,7 +18,7 @@ export default function ChatArea({
 }: ChatAreaProps) {
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
-  const [activeTool, setActiveTool] = useState<string | null>(null)
+  const [, setActiveTool] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 

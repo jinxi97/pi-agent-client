@@ -121,10 +121,10 @@ export default function ChatLayout({ onLogout, dark, onToggleTheme }: ChatLayout
             if (text) msgs.push({ role: 'assistant', text })
 
             // Extract tool_use blocks as tool messages
-            for (const block of m.content || []) {
+            for (const block of (m.content || []) as Array<Record<string, unknown>>) {
               if (block.type === 'tool_use' || block.type === 'toolUse') {
-                const toolName = block.name || block.toolName || 'tool'
-                const toolArgs = block.input || block.args
+                const toolName = (block.name || block.toolName || 'tool') as string
+                const toolArgs = (block.input || block.args) as Record<string, unknown> | undefined
                 msgs.push({ role: 'tool', text: '', toolName, toolArgs })
               }
             }
