@@ -10,6 +10,7 @@ import {
 import Sidebar from './Sidebar'
 import ChatArea from './ChatArea'
 import ThemeToggle from './ThemeToggle'
+import Onboarding from './Onboarding'
 
 interface ChatLayoutProps {
   onLogout: () => void
@@ -21,6 +22,10 @@ export default function ChatLayout({ onLogout, dark, onToggleTheme }: ChatLayout
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null)
   const [provisionStatus, setProvisionStatus] = useState('Initializing...')
   const [error, setError] = useState<string | null>(null)
+
+  const [onboardingDone, setOnboardingDone] = useState(
+    () => localStorage.getItem('pi_agent_onboarding_complete') === 'true',
+  )
 
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -75,10 +80,19 @@ export default function ChatLayout({ onLogout, dark, onToggleTheme }: ChatLayout
   // ── Load sessions once workspace is ready ────────────────────────────────
 
   useEffect(() => {
-    if (!workspace) return
+    if (!workspace || !onboardingDone) return
 
-    apiListSessions(workspace).then(setSessions).catch(console.error)
-  }, [workspace])
+    apiListSessions(workspace)
+      .then(async (loaded) => {
+        setSessions(loaded)
+        if (loaded.length === 0) {
+          const session = await apiCreateSession(workspace)
+          setSessions([session])
+          setActiveSessionId(session.id)
+        }
+      })
+      .catch(console.error)
+  }, [workspace, onboardingDone])
 
   // ── Load messages when switching sessions ────────────────────────────────
 
@@ -152,6 +166,17 @@ export default function ChatLayout({ onLogout, dark, onToggleTheme }: ChatLayout
           <p className="text-neutral-500 dark:text-neutral-400 text-sm">{provisionStatus}</p>
         </div>
       </div>
+    )
+  }
+
+  // ── Onboarding (one-time) ─────────────────────────────────────────────────
+
+  if (!onboardingDone) {
+    return (
+      <Onboarding
+        workspace={workspace}
+        onComplete={() => setOnboardingDone(true)}
+      />
     )
   }
 

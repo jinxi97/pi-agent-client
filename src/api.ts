@@ -97,6 +97,62 @@ function wsQuery(ws: WorkspaceInfo): string {
   return `namespace=${ws.namespace}&pod_name=${ws.podName}`
 }
 
+// ── Syncthing ────────────────────────────────────────────────────────────────
+
+export async function exposeSyncthing(
+  ws: WorkspaceInfo,
+): Promise<{ serviceName: string; status: string; externalIp: string | null }> {
+  const res = await apiFetch(
+    `/pi-agent/workspaces/${ws.claimName}/syncthing/expose?${wsQuery(ws)}`,
+    { method: 'POST' },
+  )
+  const data = await res.json()
+  return {
+    serviceName: data.service_name,
+    status: data.status,
+    externalIp: data.external_ip,
+  }
+}
+
+export async function getSyncthingInfo(
+  ws: WorkspaceInfo,
+): Promise<{
+  serviceName: string
+  externalIp: string | null
+  syncAddress: string | null
+  deviceId: string | null
+  folderId: string
+}> {
+  const res = await apiFetch(
+    `/pi-agent/workspaces/${ws.claimName}/syncthing/info?${wsQuery(ws)}`,
+  )
+  const data = await res.json()
+  return {
+    serviceName: data.service_name,
+    externalIp: data.external_ip,
+    syncAddress: data.sync_address,
+    deviceId: data.device_id,
+    folderId: data.folder_id,
+  }
+}
+
+export async function pairSyncthing(
+  podName: string,
+  namespace: string,
+  deviceId: string,
+  deviceName: string = 'desktop',
+): Promise<{ status: string }> {
+  const res = await apiFetch(
+    `/pi-agent/syncthing/pair?namespace=${namespace}&pod_name=${podName}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ device_id: deviceId, device_name: deviceName }),
+    },
+  )
+  const data = await res.json()
+  return { status: data.status }
+}
+
 export async function createSession(ws: WorkspaceInfo): Promise<Session> {
   const res = await apiFetch(
     `/pi-agent/workspaces/${ws.claimName}/sessions?${wsQuery(ws)}`,
