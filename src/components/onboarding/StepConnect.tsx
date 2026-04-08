@@ -53,21 +53,22 @@ export default function StepConnect({ workspace, onNext }: StepConnectProps) {
       try {
         await exposeSyncthing(workspace)
 
-        // Poll until we have both external IP and device ID
+        // Poll until we have external IP (required) and device ID (best-effort)
         for (let i = 0; i < 60; i++) {
           if (cancelled) return
           const info = await getSyncthingInfo(workspace)
-          if (info.externalIp && info.deviceId) {
+
+          if (info.externalIp) {
             if (!cancelled) {
-              setDeviceId(info.deviceId)
               setSyncAddress(info.syncAddress)
+              setDeviceId(info.deviceId) // may still be null
               setLoading(false)
             }
             return
           }
           await new Promise((r) => setTimeout(r, 3000))
         }
-        if (!cancelled) setError('Timed out waiting for syncthing to be ready')
+        if (!cancelled) setError('Timed out waiting for external IP')
       } catch (err) {
         if (!cancelled) setError((err as Error).message)
       } finally {
@@ -134,7 +135,14 @@ export default function StepConnect({ workspace, onNext }: StepConnectProps) {
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
           In Syncthing, click <strong>+ Add Remote Device</strong> and paste these values:
         </p>
-        {deviceId && <CopyField label="Device ID" value={deviceId} />}
+        {deviceId ? (
+          <CopyField label="Device ID" value={deviceId} />
+        ) : (
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500 dark:text-neutral-400">Device ID</label>
+            <p className="text-xs text-neutral-400 dark:text-neutral-500 italic">Loading...</p>
+          </div>
+        )}
         {syncAddress && <CopyField label="Address" value={syncAddress} />}
       </div>
 

@@ -45,10 +45,18 @@ export default function Onboarding({ workspace, onComplete }: OnboardingProps) {
         {step === 2 && <StepVerify onNext={() => setStep(3)} />}
         {step === 3 && <StepObsidian onDone={handleDone} />}
 
-        {/* Step label */}
-        <p className="text-center text-xs text-neutral-400 dark:text-neutral-600 mt-6">
-          Step {step + 1} of {STEPS.length}
-        </p>
+        {/* Footer */}
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-xs text-neutral-400 dark:text-neutral-600">
+            Step {step + 1} of {STEPS.length}
+          </p>
+          <button
+            onClick={handleDone}
+            className="text-xs text-neutral-400 dark:text-neutral-600 hover:text-black dark:hover:text-white transition-colors"
+          >
+            Skip setup
+          </button>
+        </div>
       </div>
     </div>
   )
